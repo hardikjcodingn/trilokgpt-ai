@@ -72,7 +72,15 @@ const queryLimiter = rateLimit({
 app.use(globalLimiter);
 */
 
-// ========== API KEY AUTHENTICATION MIDDLEWARE ==========
+// ========== API KEY AUTHENTICATION MIDDLEWARE (DISABLED FOR PERSONAL USE) ==========
+const apiKeyMiddleware = (req, res, next) => {
+  // Middleware disabled - no API key required for personal AI system
+  // If you want to re-enable, uncomment the original validation below
+  req.apiKey = 'personal-use';
+  next();
+};
+
+/* ORIGINAL VALIDATION (DISABLED):
 const apiKeyMiddleware = (req, res, next) => {
   const publicEndpoints = ['/health', '/config', '/', '/index.html'];
   if (publicEndpoints.some(ep => req.path === ep || req.path.startsWith('/css') || req.path.startsWith('/js'))) {
@@ -115,6 +123,7 @@ const apiKeyMiddleware = (req, res, next) => {
   req.apiKey = apiKey;
   next();
 };
+*/
 
 app.use(apiKeyMiddleware);
 
