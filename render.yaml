@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: trilokgpt-backend
+    env: node
+    plan: free
+    buildCommand: cd backend && npm install --force
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: OLLAMA_URL
+        value: http://localhost:11434
+      - key: OLLAMA_MODEL
+        value: llama2
