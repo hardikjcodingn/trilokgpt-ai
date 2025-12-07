@@ -128,20 +128,43 @@ const apiKeyMiddleware = (req, res, next) => {
 
 app.use(apiKeyMiddleware);
 
-// Serve static frontend files - handle both local and Render deployment paths
-const frontendPath1 = path.join(__dirname, '../frontend');
-const frontendPath2 = path.join(__dirname, './frontend');
-const frontendPath3 = '/app/frontend';
+// Serve static frontend files - handle multiple possible paths
+let frontendDir = null;
+const possiblePaths = [
+  path.join(__dirname, '../frontend'),
+  path.join(__dirname, './frontend'),
+  '/app/frontend',
+  '/app/backend/frontend'
+];
 
-let activeFrontendPath = frontendPath1;
-if (!fs.existsSync(frontendPath1) && fs.existsSync(frontendPath2)) {
-  activeFrontendPath = frontendPath2;
-} else if (!fs.existsSync(frontendPath1) && fs.existsSync(frontendPath3)) {
-  activeFrontendPath = frontendPath3;
+for (const tryPath of possiblePaths) {
+  if (fs.existsSync(tryPath)) {
+    frontendDir = tryPath;
+    console.log(`✓ Found frontend at: ${frontendDir}`);
+    break;
+  }
 }
 
-console.log(`Serving static files from: ${activeFrontendPath}`);
-app.use(express.static(activeFrontendPath));
+// If no frontend found, create a fallback 404 handler
+if (!frontendDir) {
+  console.warn('⚠ Frontend directory not found at any expected location');
+  app.get('/', (req, res) => {
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>TrilokGPT AI Backend</title></head>
+        <body>
+          <h1>TrilokGPT AI Backend Running</h1>
+          <p>Status: ✓ Online</p>
+          <p>API endpoints available at /api/</p>
+          <p>Health check: <a href="/health">/health</a></p>
+        </body>
+      </html>
+    `);
+  });
+} else {
+  app.use(express.static(frontendDir));
+}
 
 // API Routes (rate limiting disabled for personal use)
 // app.use('/api/upload', uploadLimiter);
