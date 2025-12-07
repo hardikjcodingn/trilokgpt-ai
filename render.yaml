@@ -3,7 +3,7 @@ services:
     name: trilokgpt-backend
     env: node
     plan: free
-    buildCommand: npm install --force && npm install --prefix backend --force && cp -r frontend backend/
+    buildCommand: npm install --force && npm install --prefix backend --force && mkdir -p backend/frontend && cp -r frontend/* backend/frontend/ 2>/dev/null || true
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV

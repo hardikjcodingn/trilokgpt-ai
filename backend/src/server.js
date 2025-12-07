@@ -5,6 +5,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { ApiKeyManager } from './utils/apiKeyManager.js';
@@ -127,8 +128,20 @@ const apiKeyMiddleware = (req, res, next) => {
 
 app.use(apiKeyMiddleware);
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, '../frontend')));
+// Serve static frontend files - handle both local and Render deployment paths
+const frontendPath1 = path.join(__dirname, '../frontend');
+const frontendPath2 = path.join(__dirname, './frontend');
+const frontendPath3 = '/app/frontend';
+
+let activeFrontendPath = frontendPath1;
+if (!fs.existsSync(frontendPath1) && fs.existsSync(frontendPath2)) {
+  activeFrontendPath = frontendPath2;
+} else if (!fs.existsSync(frontendPath1) && fs.existsSync(frontendPath3)) {
+  activeFrontendPath = frontendPath3;
+}
+
+console.log(`Serving static files from: ${activeFrontendPath}`);
+app.use(express.static(activeFrontendPath));
 
 // API Routes (rate limiting disabled for personal use)
 // app.use('/api/upload', uploadLimiter);
