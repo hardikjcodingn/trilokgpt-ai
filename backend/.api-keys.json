@@ -1,0 +1,18 @@
+[
+  {
+    "key": "sk_e42818e12f6c097434e86e6c707ad4e14363abc58c2900d86c3ddc6c19cbe",
+    "name": "Production API Key",
+    "created": "2025-12-07T09:25:29.812Z",
+    "lastUsed": null,
+    "requestCount": 0,
+    "environment": "production"
+  },
+  {
+    "key": "sk_214282b4ea27e044afcad6b8f402ef8c056d587ac31c747371d8e2006d091",
+    "name": "Testing API Key",
+    "created": "2025-12-07T09:25:29.815Z",
+    "lastUsed": null,
+    "requestCount": 0,
+    "environment": "testing"
+  }
+]

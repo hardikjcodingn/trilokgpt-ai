@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrilokGPT - AI Document Analysis & Q&A</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <h1 class="logo">🚀 TrilokGPT</h1>
+        <p class="tagline">Free AI Document Analysis & Q&A System</p>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <!-- Left Sidebar - Upload -->
+      <aside class="sidebar">
+        <div class="upload-section">
+          <h2>📁 Upload Documents</h2>
+          <p class="info-text">
+            Upload PDF, DOCX, TXT, or images. Max 500MB.
+          </p>
+
+          <div class="upload-area" id="uploadArea">
+            <input
+              type="file"
+              id="fileInput"
+              multiple
+              accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.tiff"
+              style="display: none"
+            />
+            <p class="upload-prompt">
+              📤 Drag & drop files or <span class="upload-link">click to browse</span>
+            </p>
+          </div>
+
+          <div id="uploadProgress" style="display: none; margin-top: 15px">
+            <div class="progress-bar">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <p id="progressText" class="progress-text">Uploading...</p>
+          </div>
+
+          <hr />
+
+          <h3>📚 Your Documents</h3>
+          <div id="documentsList" class="documents-list">
+            <p class="empty-state">No documents uploaded yet</p>
+          </div>
+
+          <hr />
+
+          <div class="stats-box">
+            <h3>📊 Stats</h3>
+            <p>Documents: <span id="statsDocuments">0</span></p>
+            <p>Chunks: <span id="statsChunks">0</span></p>
+            <p>Status: <span id="statusIndicator" class="status-offline">●</span> Ollama</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-panel">
+        <!-- Chat/Query Section -->
+        <div class="chat-section">
+          <h2>💬 Ask Questions</h2>
+          <p class="info-text">
+            Ask questions about your uploaded documents in English or Hindi
+          </p>
+
+          <div class="chat-container">
+            <div id="chatMessages" class="chat-messages">
+              <div class="welcome-message">
+                <h3>👋 Welcome to TrilokGPT!</h3>
+                <p>
+                  Upload documents on the left, then ask questions about them here.
+                </p>
+                <ul>
+                  <li>✅ Works completely FREE - no API keys needed</li>
+                  <li>✅ Supports PDF, DOCX, TXT, and images (with OCR)</li>
+                  <li>✅ Ask in English or Hindi</li>
+                  <li>✅ Powered by open-source AI models</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="chat-input-container">
+              <div class="input-group">
+                <textarea
+                  id="questionInput"
+                  class="question-input"
+                  placeholder="Ask a question... (English or Hindi)"
+                  rows="3"
+                ></textarea>
+                <button id="sendBtn" class="btn btn-primary" style="margin-top: 10px">
+                  Send ➤
+                </button>
+              </div>
+
+              <div class="options">
+                <label class="checkbox">
+                  <input type="checkbox" id="useOllama" />
+                  Use Ollama LLM for detailed answers
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Details Panel -->
+        <div class="details-panel" id="detailsPanel" style="display: none">
+          <div class="details-header">
+            <h3>📄 Document Preview</h3>
+            <button class="btn-close" id="closeDetailsBtn">✕</button>
+          </div>
+          <div id="detailsContent" class="details-content"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>
+        🔒 100% Private & Free | 🚀 Powered by Ollama, Tesseract, and FAISS |
+        📖 <a href="https://trilokgpt.in" target="_blank">trilokgpt.in</a>
+      </p>
+    </footer>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

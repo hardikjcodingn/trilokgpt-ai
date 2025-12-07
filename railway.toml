@@ -1,0 +1,23 @@
+# Railway.io Deployment Configuration
+# This file configures how TrilokGPT deploys on Railway
+# Railway automatically detects Node.js and sets up the service
+
+[build]
+builder = "heroku.buildpacks"
+buildpacks = [
+  "heroku/nodejs",
+  "heroku/python"
+]
+
+[deploy]
+startCommand = "cd backend && npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+
+[env]
+NODE_ENV = "production"
+PORT = "8000"
+OLLAMA_URL = "${OLLAMA_PRIVATE_URL}"
+OLLAMA_MODEL = "llama2"
+EMBEDDING_MODEL = "nomic-embed-text"
+ALLOWED_ORIGINS = "${RAILWAY_PUBLIC_DOMAIN}"

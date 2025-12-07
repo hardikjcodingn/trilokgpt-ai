@@ -1,0 +1,77 @@
+version: '3.9'
+
+services:
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: trilokgpt-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - trilokgpt-network
+
+  # TrilokGPT Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: trilokgpt-backend
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: llama2
+      EMBEDDING_MODEL: nomic-embed-text
+      ALLOWED_ORIGINS: "*"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./vectors:/app/vectors
+    restart: unless-stopped
+    networks:
+      - trilokgpt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Nginx Reverse Proxy with HTTPS
+  nginx:
+    image: nginx:alpine
+    container_name: trilokgpt-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - trilokgpt-network
+
+volumes:
+  ollama-data:
+    driver: local
+
+networks:
+  trilokgpt-network:
+    driver: bridge
