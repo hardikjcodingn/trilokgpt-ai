@@ -45,7 +45,9 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// ========== RATE LIMITING ==========
+// ========== RATE LIMITING (DISABLED - Personal AI System) ==========
+// Rate limiting disabled for personal use. Uncomment if needed for production.
+/*
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
@@ -68,6 +70,7 @@ const queryLimiter = rateLimit({
 });
 
 app.use(globalLimiter);
+*/
 
 // ========== API KEY AUTHENTICATION MIDDLEWARE ==========
 const apiKeyMiddleware = (req, res, next) => {
@@ -104,9 +107,9 @@ app.use(apiKeyMiddleware);
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// API Routes with rate limiting
-app.use('/api/upload', uploadLimiter);
-app.use('/api/query', queryLimiter);
+// API Routes (rate limiting disabled for personal use)
+// app.use('/api/upload', uploadLimiter);
+// app.use('/api/query', queryLimiter);
 createUploadRoutes(app, embedding, ollama);
 
 /**
