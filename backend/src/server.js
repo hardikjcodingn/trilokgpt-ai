@@ -79,20 +79,34 @@ const apiKeyMiddleware = (req, res, next) => {
     return next();
   }
 
+  // Support multiple ways of passing API key:
+  // 1. Authorization: Bearer <key>
+  // 2. Authorization: <key>
+  // 3. X-API-Key header
+  let apiKey = null;
+  
   const authHeader = req.headers.authorization;
-  if (!authHeader) {
+  if (authHeader) {
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      apiKey = parts[1];
+    } else if (parts.length === 1) {
+      apiKey = parts[0];
+    }
+  }
+  
+  // Fallback to X-API-Key header
+  if (!apiKey) {
+    apiKey = req.headers['x-api-key'];
+  }
+
+  if (!apiKey) {
     return res.status(401).json({
       error: 'Missing API key',
-      message: 'Authorization: Bearer <api_key>'
+      message: 'Include Authorization header with Bearer token or X-API-Key header'
     });
   }
 
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return res.status(401).json({ error: 'Invalid authorization format' });
-  }
-
-  const apiKey = parts[1];
   const validation = apiKeyManager.validateKey(apiKey);
   if (!validation.valid) {
     return res.status(403).json({ error: 'Invalid API key' });
@@ -148,6 +162,17 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     version: '2.0.0'
+  });
+});
+
+/**
+ * GET /api/test - Test API key validity
+ */
+app.get('/api/test', apiKeyMiddleware, (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'API key is valid',
+    apiKey: req.apiKey.substring(0, 4) + '...' + req.apiKey.substring(60)
   });
 });
 
