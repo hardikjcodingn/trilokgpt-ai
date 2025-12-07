@@ -1,9 +1,15 @@
 services:
   - type: web
+    name: trilokgpt-ollama
+    env: docker
+    plan: free
+    dockerfile: Dockerfile.ollama
+    
+  - type: web
     name: trilokgpt-backend
     env: node
     plan: free
-    buildCommand: npm install --force && npm install --prefix backend --force && mkdir -p backend/frontend && cp -r frontend/* backend/frontend/ 2>/dev/null || true
+    buildCommand: cp -r frontend backend/ 2>/dev/null || true ; cd backend && npm install --force
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
@@ -11,6 +17,6 @@ services:
       - key: PORT
         value: 8000
       - key: OLLAMA_URL
-        value: http://localhost:11434
+        value: https://trilokgpt-ollama.onrender.com
       - key: OLLAMA_MODEL
         value: llama2

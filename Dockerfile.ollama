@@ -1,0 +1,7 @@
+FROM ollama/ollama:latest
+
+# Expose Ollama port
+EXPOSE 11434
+
+# Start Ollama and pull llama2 model
+CMD ollama serve & sleep 10 && ollama pull llama2 && wait
