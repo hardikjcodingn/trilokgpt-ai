@@ -26,7 +26,20 @@ const VECTOR_STORE_PATH = process.env.VECTOR_STORE_PATH || path.join(__dirname, 
 
 // Initialize modules
 const embedding = new EmbeddingModule(OLLAMA_URL, EMBEDDING_MODEL);
-const groq = new GroqModule(GROQ_API_KEY);
+
+let groq;
+try {
+  if (!GROQ_API_KEY) {
+    console.warn('⚠️  GROQ_API_KEY not set. Initialize with groq = null');
+    groq = null;
+  } else {
+    groq = new GroqModule(GROQ_API_KEY);
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Groq module:', error.message);
+  groq = null;
+}
+
 const apiKeyManager = new ApiKeyManager();
 
 // Initialize Express app
@@ -184,15 +197,14 @@ app.get('/', (req, res) => {
 app.get('/api/config', (req, res) => {
   res.json({
     apiUrl: process.env.API_URL || 'http://localhost:' + PORT,
-    ollamaUrl: OLLAMA_URL,
     supportedFormats: ['PDF', 'DOCX', 'TXT', 'JPG', 'PNG'],
     maxFileSize: 500,
     embeddingModel: EMBEDDING_MODEL,
-    ollamaModel: OLLAMA_MODEL,
+    llmProvider: 'Groq (Mixtral 8x7B)',
     version: '2.0.0',
     security: {
-      apiKey: true,
-      rateLimiting: true,
+      apiKey: false,
+      rateLimiting: false,
       https: process.env.NODE_ENV === 'production'
     }
   });
@@ -244,8 +256,7 @@ app.use((err, req, res, next) => {
 function startServer() {
   console.log('🚀 Starting TrilokGPT Backend...');
   console.log('📦 Configuration:');
-  console.log(`   - Ollama URL: ${OLLAMA_URL}`);
-  console.log(`   - Ollama Model: ${OLLAMA_MODEL}`);
+  console.log(`   - Groq API: Configured`);
   console.log(`   - Embedding Model: ${EMBEDDING_MODEL}`);
   console.log(`   - Vector Store: ${VECTOR_STORE_PATH}`);
 
@@ -268,26 +279,7 @@ function startServer() {
       .catch(err => {
         console.log('📝 Starting with empty vector store (this is OK on first run)');
         console.error('Vector store error (ignored):', err.message);
-      }),
-    
-    (async () => {
-      console.log('\n🔍 Checking Ollama service...');
-      try {
-        const ready = await ollama.isReady();
-        if (ready) {
-          console.log('✅ Ollama is available');
-          const models = await ollama.listModels();
-          console.log(`   Available models: ${models.join(', ')}`);
-        } else {
-          console.warn('⚠️  Ollama is not available');
-          console.warn('   Install Ollama from https://ollama.ai');
-          console.warn('   Then run: ollama run llama2');
-          console.warn('   (You can still use the system for document analysis without Ollama)');
-        }
-      } catch (error) {
-        console.warn('⚠️  Could not check Ollama:', error.message);
-      }
-    })()
+      })
   ]).catch(err => {
     console.error('Background initialization error (non-fatal):', err.message);
   });
