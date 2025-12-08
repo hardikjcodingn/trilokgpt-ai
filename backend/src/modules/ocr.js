@@ -22,21 +22,27 @@ export class OCRModule {
         return;
       }
 
-      console.log('[OCR] Initializing Tesseract worker with languages: eng+hin...');
+      console.log('[OCR] Initializing Tesseract worker with language: eng...');
       const { createWorker } = Tesseract;
-      this.worker = await createWorker({
-        logger: (m) => {
-          if (m.status === 'recognizing') {
-            console.log(`[OCR] Recognition progress: ${Math.round(m.progress * 100)}%`);
-          } else if (m.status === 'loading') {
-            console.log(`[OCR] Loading progress: ${Math.round(m.progress * 100)}%`);
-          }
-        },
-      });
       
-      console.log('[OCR] Loading language models...');
-      await this.worker.loadLanguage('eng+hin');
-      await this.worker.initialize('eng+hin');
+      // Use only 'eng' for faster initialization on limited resources
+      // Hindi support can be added on-demand if needed
+      this.worker = await Promise.race([
+        createWorker({
+          logger: (m) => {
+            if (m.status === 'recognizing') {
+              console.log(`[OCR] Recognition progress: ${Math.round(m.progress * 100)}%`);
+            }
+          },
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Tesseract initialization timeout (60s)')), 60000)
+        )
+      ]);
+      
+      console.log('[OCR] Loading English language model...');
+      await this.worker.loadLanguage('eng');
+      await this.worker.initialize('eng');
       console.log('[OCR] Tesseract worker initialized successfully');
     } catch (error) {
       console.error('[OCR] Initialization failed:', error.message);
@@ -60,22 +66,19 @@ export class OCRModule {
         await this.initialize();
       }
 
-      // Determine language for Tesseract
-      let lang = language;
-      if (language === 'auto') {
-        lang = 'eng+hin'; // Try both English and Hindi
-        console.log('[OCR] Using auto language detection: eng+hin');
-      } else if (language === 'hin') {
-        lang = 'hin';
-      } else {
-        lang = 'eng';
-      }
-
+      // Always use 'eng' for reliability - multi-language adds memory overhead
+      const lang = 'eng';
       console.log(`[OCR] Recognizing text with language: ${lang}`);
-      const { data } = await this.worker.recognize(imagePath, lang);
+      
+      const recognizePromise = this.worker.recognize(imagePath, lang);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('OCR recognition timeout (120s)')), 120000)
+      );
+      
+      const { data } = await Promise.race([recognizePromise, timeoutPromise]);
       
       const extractedText = data.text;
-      console.log(`[OCR] Text extraction completed. Confidence: ${data.confidence}%, Text length: ${extractedText.length} characters`);
+      console.log(`[OCR] Text extraction completed. Confidence: ${Math.round(data.confidence)}%, Text length: ${extractedText.length} characters`);
       
       return extractedText;
     } catch (error) {

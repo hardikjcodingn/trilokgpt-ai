@@ -48,6 +48,13 @@ const app = express();
 // ========== SECURITY MIDDLEWARE ==========
 app.use(helmet());
 app.use(compression());
+
+// Set request timeout - 5 minutes for large files
+app.use((req, res, next) => {
+  req.setTimeout(300000); // 5 minutes
+  res.setTimeout(300000);
+  next();
+});
 app.use(morgan('combined'));
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['*'],
@@ -282,6 +289,29 @@ function startServer() {
       })
   ]).catch(err => {
     console.error('Background initialization error (non-fatal):', err.message);
+  });
+
+  // Graceful shutdown handling
+  process.on('SIGTERM', () => {
+    console.log('⚠️  SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
+    
+    // Force shutdown after 30 seconds
+    setTimeout(() => {
+      console.error('❌ Forced shutdown after 30 seconds');
+      process.exit(1);
+    }, 30000);
+  });
+
+  process.on('SIGINT', () => {
+    console.log('⚠️  SIGINT received, shutting down gracefully...');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
   });
 
   // Keep process alive - indefinitely
