@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import DocumentExtractor from '../modules/documentExtractor.js';
 import OCRModule from '../modules/ocr.js';
+import OCRFallback from '../modules/ocrFallback.js';
 import TextChunker from '../modules/textChunker.js';
 import LanguageDetector from '../utils/languageDetector.js';
 import { FileManager, isSupportedType, getFileTypeCategory, SUPPORTED_TYPES } from '../utils/fileManager.js';
@@ -114,7 +115,15 @@ export function createUploadRoutes(app, embedding, groq) {
           console.log(`[Process] OCR completed successfully, extracted ${extractedText.length} characters`);
         } catch (ocrError) {
           console.error('[Process] OCR extraction failed:', ocrError.message);
-          throw new Error(`OCR failed: ${ocrError.message}`);
+          console.log('[Process] Attempting OCR fallback strategy...');
+          
+          try {
+            extractedText = await OCRFallback.extractWithFallbacks(fileInfo.filePath, {});
+            console.log('[Process] Fallback OCR succeeded');
+          } catch (fallbackError) {
+            console.error('[Process] Fallback OCR also failed:', fallbackError.message);
+            throw new Error(`OCR failed: ${ocrError.message}`);
+          }
         }
       }
 

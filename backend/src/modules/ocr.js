@@ -1,6 +1,6 @@
 import Tesseract from 'tesseract.js';
-import Jimp from 'jimp';
 import fs from 'fs';
+import path from 'path';
 
 /**
  * OCR Module - Extract text from images using Tesseract.js (free)
@@ -10,6 +10,7 @@ import fs from 'fs';
 export class OCRModule {
   constructor() {
     this.worker = null;
+    this.initializing = false;
   }
 
   /**
@@ -17,35 +18,57 @@ export class OCRModule {
    */
   async initialize() {
     try {
+      // Prevent multiple initialization attempts
+      if (this.initializing) {
+        console.log('[OCR] Already initializing, waiting...');
+        let retries = 0;
+        while (this.initializing && retries < 30) {
+          await new Promise(r => setTimeout(r, 100));
+          retries++;
+        }
+        if (this.worker) return;
+        throw new Error('Initialization took too long');
+      }
+
       if (this.worker) {
         console.log('[OCR] Worker already initialized');
         return;
       }
 
+      this.initializing = true;
       console.log('[OCR] Initializing Tesseract worker with language: eng...');
+      
       const { createWorker } = Tesseract;
       
-      // Use only 'eng' for faster initialization on limited resources
-      // Hindi support can be added on-demand if needed
-      this.worker = await Promise.race([
-        createWorker({
-          logger: (m) => {
-            if (m.status === 'recognizing') {
-              console.log(`[OCR] Recognition progress: ${Math.round(m.progress * 100)}%`);
-            }
-          },
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Tesseract initialization timeout (60s)')), 60000)
-        )
-      ]);
+      // Create worker with proper configuration for Node.js
+      const initPromise = createWorker({
+        logger: (m) => {
+          if (m.status === 'recognizing') {
+            console.log(`[OCR] Recognition progress: ${Math.round(m.progress * 100)}%`);
+          } else if (m.status === 'load') {
+            console.log('[OCR] Loading worker...');
+          }
+        },
+        // Configure for Node.js environment
+        errorHandler: (err) => console.error('[OCR] Worker error:', err),
+      });
+      
+      // Use timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Tesseract initialization timeout (60s)')), 60000)
+      );
+      
+      this.worker = await Promise.race([initPromise, timeoutPromise]);
       
       console.log('[OCR] Loading English language model...');
       await this.worker.loadLanguage('eng');
       await this.worker.initialize('eng');
       console.log('[OCR] Tesseract worker initialized successfully');
+      
+      this.initializing = false;
     } catch (error) {
       console.error('[OCR] Initialization failed:', error.message);
+      this.initializing = false;
       this.worker = null;
       throw error;
     }
@@ -60,6 +83,13 @@ export class OCRModule {
   async extractText(imagePath, language = 'eng') {
     try {
       console.log(`[OCR] Starting text extraction for: ${imagePath}`);
+      
+      // Validate file exists
+      if (!fs.existsSync(imagePath)) {
+        throw new Error(`File not found: ${imagePath}`);
+      }
+      
+      console.log('[OCR] File exists, proceeding with OCR...');
       
       if (!this.worker) {
         console.log('[OCR] Worker not initialized, initializing now...');
@@ -77,8 +107,13 @@ export class OCRModule {
       
       const { data } = await Promise.race([recognizePromise, timeoutPromise]);
       
-      const extractedText = data.text;
+      const extractedText = data.text || '';
       console.log(`[OCR] Text extraction completed. Confidence: ${Math.round(data.confidence)}%, Text length: ${extractedText.length} characters`);
+      
+      if (!extractedText || extractedText.trim().length === 0) {
+        console.warn('[OCR] Warning: OCR returned empty or whitespace-only text');
+        return '[No text detected in image]'; // Return placeholder instead of empty
+      }
       
       return extractedText;
     } catch (error) {
