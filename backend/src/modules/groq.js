@@ -9,8 +9,13 @@ export default class GroqModule {
     if (!apiKey) {
       throw new Error('GROQ_API_KEY environment variable is required');
     }
-    this.groq = new Groq({ apiKey });
-    this.model = 'mixtral-8x7b-32768'; // Fast and capable model
+    try {
+      this.client = new Groq({ apiKey });
+    } catch (error) {
+      console.error('Failed to initialize Groq client:', error);
+      throw error;
+    }
+    this.model = 'llama-3.3-70b-versatile'; // Latest powerful Groq model
   }
 
   /**
@@ -21,7 +26,7 @@ export default class GroqModule {
    */
   async generate(prompt, maxTokens = 1024) {
     try {
-      const message = await this.groq.messages.create({
+      const message = await this.client.chat.completions.create({
         messages: [
           {
             role: 'user',
@@ -33,8 +38,8 @@ export default class GroqModule {
         temperature: 0.7
       });
 
-      if (message.content && message.content.length > 0) {
-        return message.content[0].text;
+      if (message.choices && message.choices.length > 0) {
+        return message.choices[0].message.content;
       }
       
       return 'No response generated';
@@ -52,15 +57,15 @@ export default class GroqModule {
    */
   async chat(messages, maxTokens = 1024) {
     try {
-      const response = await this.groq.messages.create({
+      const response = await this.client.chat.completions.create({
         messages,
         model: this.model,
         max_tokens: maxTokens,
         temperature: 0.7
       });
 
-      if (response.content && response.content.length > 0) {
-        return response.content[0].text;
+      if (response.choices && response.choices.length > 0) {
+        return response.choices[0].message.content;
       }
       
       return 'No response generated';
@@ -76,7 +81,7 @@ export default class GroqModule {
    */
   async isAvailable() {
     try {
-      const message = await this.groq.messages.create({
+      const message = await this.client.chat.completions.create({
         messages: [{ role: 'user', content: 'test' }],
         model: this.model,
         max_tokens: 10
