@@ -312,13 +312,19 @@ export function createUploadRoutes(app, embedding, groq) {
       // Detect question language
       const questionLang = LanguageDetector.detect(question);
 
-      // Search for relevant chunks from documents
-      const searchResults = await embedding.query(question, 5);
-
       let answer;
-      let source = 'embedding_only';
+      let source = 'direct';
+      let searchResults = [];
 
-      // Try to use Groq for better responses
+      // Try to search documents first
+      try {
+        searchResults = await embedding.query(question, 5);
+      } catch (e) {
+        console.warn('[Ask] Document search failed:', e.message);
+        // Continue without document context
+      }
+
+      // Try to use Groq for responses
       try {
         if (groq && searchResults.length > 0) {
           // Build RAG prompt with context
@@ -344,10 +350,12 @@ export function createUploadRoutes(app, embedding, groq) {
           answer = questionLang === 'hi'
             ? `निम्नलिखित संदर्भ प्रासंगिक हो सकता है:\n\n${contexts.slice(0, 2).join('\n\n')}`
             : `Based on the document:\n\n${contexts.slice(0, 2).join('\n\n')}`;
+          source = 'fallback_context';
         } else {
           answer = questionLang === 'hi'
-            ? 'कृपया पहले एक दस्तावेज़ अपलोड करें।'
-            : 'Please upload a document first.';
+            ? 'कृपया पहले एक दस्तावेज़ अपलोड करें या सीधे प्रश्न पूछें।'
+            : 'Please upload a document first or ask a question directly.';
+          source = 'fallback_no_docs';
         }
       }
 
