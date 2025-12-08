@@ -295,19 +295,126 @@ export function createUploadRoutes(app, embedding, groq) {
   });
 
   /**
+   * POST /api/ask - Lovable compatibility endpoint for AI chat
+   * Converts Lovable format to internal query format
+   */
+  app.post('/api/ask', async (req, res) => {
+    try {
+      const { message, messages = [], model = 'groq' } = req.body;
+
+      // Extract the question from either 'message' or 'messages' array
+      const question = message || (messages.length > 0 ? messages[messages.length - 1].content : '');
+
+      if (!question || question.trim().length === 0) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      // Detect question language
+      const questionLang = LanguageDetector.detect(question);
+
+      // Search for relevant chunks from documents
+      const searchResults = await embedding.query(question, 5);
+
+      let answer;
+      let source = 'embedding_only';
+
+      // Try to use Groq for better responses
+      try {
+        if (groq && searchResults.length > 0) {
+          // Build RAG prompt with context
+          const contexts = searchResults.map(r => r.text);
+          const contextStr = contexts.slice(0, 3).join('\n\n');
+          
+          const ragPrompt = questionLang === 'hi' 
+            ? `निम्नलिखित संदर्भ के आधार पर प्रश्न का उत्तर दें:\n\nसंदर्भ:\n${contextStr}\n\nप्रश्न: ${question}\n\nउत्तर:`
+            : `Based on the following context, answer the question:\n\nContext:\n${contextStr}\n\nQuestion: ${question}\n\nAnswer:`;
+          
+          answer = await groq.generate(ragPrompt, 1024);
+          source = 'groq_rag';
+        } else if (groq) {
+          // No documents uploaded, just use Groq directly
+          answer = await groq.generate(question, 1024);
+          source = 'groq_direct';
+        }
+      } catch (error) {
+        console.warn('[Ask] Groq generation failed:', error.message);
+        // Fall back to context-based answer
+        if (searchResults.length > 0) {
+          const contexts = searchResults.map(r => r.text);
+          answer = questionLang === 'hi'
+            ? `निम्नलिखित संदर्भ प्रासंगिक हो सकता है:\n\n${contexts.slice(0, 2).join('\n\n')}`
+            : `Based on the document:\n\n${contexts.slice(0, 2).join('\n\n')}`;
+        } else {
+          answer = questionLang === 'hi'
+            ? 'कृपया पहले एक दस्तावेज़ अपलोड करें।'
+            : 'Please upload a document first.';
+        }
+      }
+
+      // Return in Lovable-compatible format
+      res.json({
+        content: answer,
+        message: answer,
+        answer: answer,
+        role: 'assistant',
+        timestamp: new Date().toISOString(),
+        source: source,
+        relevantChunks: searchResults.map(r => ({
+          text: r.text,
+          similarity: r.similarity,
+          docId: r.docId,
+        })),
+      });
+    } catch (error) {
+      console.error('[Ask] Error:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/models - Lovable compatibility endpoint for model list
+   */
+  app.get('/api/models', (req, res) => {
+    try {
+      res.json({
+        models: [
+          {
+            id: 'groq-llama-3.3-70b',
+            name: 'Groq Llama 3.3 70B (Ultra-Fast)',
+            provider: 'groq',
+            type: 'text-generation',
+            speed: 'ultra-fast',
+            context: 8192,
+          },
+          {
+            id: 'trilokgpt-rag',
+            name: 'TrilokGPT RAG (Document Q&A)',
+            provider: 'groq',
+            type: 'document-qa',
+            speed: 'ultra-fast',
+            context: 8192,
+          },
+        ],
+        default: 'groq-llama-3.3-70b',
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
    * GET /api/health - Health check
    */
   app.get('/api/health', async (req, res) => {
     try {
-      const ollamaReady = await ollama.isReady();
       const stats = embedding.getStats();
 
       res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        ollama: {
-          available: ollamaReady,
-          model: ollama.model,
+        groq: {
+          available: groq ? true : false,
+          model: groq ? 'llama-3.3-70b-versatile' : 'none',
         },
         vectorStore: {
           documents: stats.totalDocuments,
