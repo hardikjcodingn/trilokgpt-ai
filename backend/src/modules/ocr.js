@@ -17,11 +17,30 @@ export class OCRModule {
    */
   async initialize() {
     try {
+      if (this.worker) {
+        console.log('[OCR] Worker already initialized');
+        return;
+      }
+
+      console.log('[OCR] Initializing Tesseract worker with languages: eng+hin...');
       const { createWorker } = Tesseract;
-      this.worker = await createWorker();
-      console.log('[OCR] Tesseract worker initialized');
+      this.worker = await createWorker({
+        logger: (m) => {
+          if (m.status === 'recognizing') {
+            console.log(`[OCR] Recognition progress: ${Math.round(m.progress * 100)}%`);
+          } else if (m.status === 'loading') {
+            console.log(`[OCR] Loading progress: ${Math.round(m.progress * 100)}%`);
+          }
+        },
+      });
+      
+      console.log('[OCR] Loading language models...');
+      await this.worker.loadLanguage('eng+hin');
+      await this.worker.initialize('eng+hin');
+      console.log('[OCR] Tesseract worker initialized successfully');
     } catch (error) {
       console.error('[OCR] Initialization failed:', error.message);
+      this.worker = null;
       throw error;
     }
   }
@@ -34,22 +53,34 @@ export class OCRModule {
    */
   async extractText(imagePath, language = 'eng') {
     try {
-      if (!this.worker) await this.initialize();
+      console.log(`[OCR] Starting text extraction for: ${imagePath}`);
+      
+      if (!this.worker) {
+        console.log('[OCR] Worker not initialized, initializing now...');
+        await this.initialize();
+      }
 
       // Determine language for Tesseract
       let lang = language;
       if (language === 'auto') {
         lang = 'eng+hin'; // Try both English and Hindi
+        console.log('[OCR] Using auto language detection: eng+hin');
       } else if (language === 'hin') {
         lang = 'hin';
       } else {
         lang = 'eng';
       }
 
+      console.log(`[OCR] Recognizing text with language: ${lang}`);
       const { data } = await this.worker.recognize(imagePath, lang);
-      return data.text;
+      
+      const extractedText = data.text;
+      console.log(`[OCR] Text extraction completed. Confidence: ${data.confidence}%, Text length: ${extractedText.length} characters`);
+      
+      return extractedText;
     } catch (error) {
       console.error(`[OCR] Text extraction failed for ${imagePath}:`, error.message);
+      console.error('[OCR] Error stack:', error.stack);
       throw error;
     }
   }

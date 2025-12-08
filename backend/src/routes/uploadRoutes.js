@@ -77,7 +77,18 @@ export function createUploadRoutes(app, embedding, groq) {
       // Extract text based on file type
       if (fileType === 'PDF') {
         console.log(`[Process] Extracting PDF: ${fileInfo.originalName}`);
-        extractedText = await DocumentExtractor.extract(fileInfo.filePath);
+        try {
+          extractedText = await DocumentExtractor.extract(fileInfo.filePath);
+        } catch (pdfError) {
+          console.warn('[Process] PDF text extraction failed, trying OCR on PDF images:', pdfError.message);
+          // If PDF text extraction fails, try OCR as fallback
+          try {
+            // For PDFs, we'd need to convert to images first (complex)
+            throw new Error('PDF requires text extraction, OCR fallback not available');
+          } catch (e) {
+            throw pdfError;
+          }
+        }
       } else if (fileType === 'DOCX') {
         console.log(`[Process] Extracting DOCX: ${fileInfo.originalName}`);
         extractedText = await DocumentExtractor.extract(fileInfo.filePath);
@@ -86,8 +97,25 @@ export function createUploadRoutes(app, embedding, groq) {
         extractedText = await DocumentExtractor.extract(fileInfo.filePath);
       } else if (fileType === 'IMAGE') {
         console.log(`[Process] Running OCR on image: ${fileInfo.originalName}`);
-        await OCRModule.initialize();
-        extractedText = await OCRModule.extractText(fileInfo.filePath, 'auto');
+        try {
+          // Initialize OCR worker if not already initialized
+          if (!OCRModule.worker) {
+            console.log('[Process] Initializing Tesseract OCR worker...');
+            await OCRModule.initialize();
+          }
+          
+          console.log(`[Process] Extracting text from image using Tesseract: ${fileInfo.filePath}`);
+          extractedText = await OCRModule.extractText(fileInfo.filePath, 'auto');
+          
+          if (!extractedText || extractedText.trim().length === 0) {
+            throw new Error('OCR returned empty text');
+          }
+          
+          console.log(`[Process] OCR completed successfully, extracted ${extractedText.length} characters`);
+        } catch (ocrError) {
+          console.error('[Process] OCR extraction failed:', ocrError.message);
+          throw new Error(`OCR failed: ${ocrError.message}`);
+        }
       }
 
       if (!extractedText || extractedText.trim().length === 0) {
