@@ -13,7 +13,7 @@ import { FileManager, isSupportedType, getFileTypeCategory, SUPPORTED_TYPES } fr
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function createUploadRoutes(app, embedding, ollama) {
+export function createUploadRoutes(app, embedding, groq) {
   const fileManager = new FileManager(path.join(__dirname, '../../uploads'));
   
   // Configure multer for file uploads
@@ -249,22 +249,28 @@ export function createUploadRoutes(app, embedding, ollama) {
       let answer;
       let source = 'embedding_only';
 
-      // Use Ollama if requested
+      // Use Groq AI for better responses
       if (useOllama) {
         try {
-          const isReady = await ollama.isReady();
-          if (!isReady) {
-            console.warn('[Query] Ollama not available, using fallback');
+          const isAvailable = await groq.isAvailable();
+          if (!isAvailable) {
+            console.warn('[Query] Groq not available, using fallback');
           } else {
-            answer = await ollama.generateRAGAnswer(question, contexts, questionLang);
-            source = 'ollama_rag';
+            // Build RAG prompt with context
+            const contextStr = contexts.slice(0, 3).join('\n\n');
+            const ragPrompt = questionLang === 'hi' 
+              ? `निम्नलिखित संदर्भ के आधार पर प्रश्न का उत्तर दें:\n\nसंदर्भ:\n${contextStr}\n\nप्रश्न: ${question}\n\nउत्तर:`
+              : `Based on the following context, answer the question:\n\nContext:\n${contextStr}\n\nQuestion: ${question}\n\nAnswer:`;
+            
+            answer = await groq.generate(ragPrompt, 1024);
+            source = 'groq_rag';
           }
         } catch (error) {
-          console.warn('[Query] Ollama generation failed, using fallback:', error.message);
+          console.warn('[Query] Groq generation failed, using fallback:', error.message);
         }
       }
 
-      // Fallback: Return context if no Ollama answer
+      // Fallback: Return context if no Groq answer
       if (!answer) {
         answer = questionLang === 'hi'
           ? `निम्नलिखित संदर्भ प्रासंगिक हो सकता है:\n\n${contexts.slice(0, 2).join('\n\n')}`

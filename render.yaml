@@ -10,7 +10,3 @@ services:
         value: production
       - key: PORT
         value: 8000
-      - key: OLLAMA_URL
-        value: http://localhost:11434
-      - key: OLLAMA_MODEL
-        value: llama2

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { ApiKeyManager } from './utils/apiKeyManager.js';
 import EmbeddingModule from './modules/embedding.js';
-import OllamaModule from './modules/ollama.js';
+import GroqModule from './modules/groq.js';
 import { createUploadRoutes } from './routes/uploadRoutes.js';
 
 dotenv.config();
@@ -19,14 +19,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Configuration
 const PORT = process.env.PORT || 8000;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama2';
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'nomic-embed-text';
 const VECTOR_STORE_PATH = process.env.VECTOR_STORE_PATH || path.join(__dirname, '../vectors/store.json');
 
 // Initialize modules
 const embedding = new EmbeddingModule(OLLAMA_URL, EMBEDDING_MODEL);
-const ollama = new OllamaModule(OLLAMA_URL, OLLAMA_MODEL);
+const groq = new GroqModule(GROQ_API_KEY);
 const apiKeyManager = new ApiKeyManager();
 
 // Initialize Express app
@@ -169,7 +169,7 @@ if (!frontendDir) {
 // API Routes (rate limiting disabled for personal use)
 // app.use('/api/upload', uploadLimiter);
 // app.use('/api/query', queryLimiter);
-createUploadRoutes(app, embedding, ollama);
+createUploadRoutes(app, embedding, groq);
 
 /**
  * GET / - Serve main HTML
