@@ -474,5 +474,127 @@ export function createUploadRoutes(app, embedding, groq) {
     }
   });
 
+  /**
+   * POST /api/ocr - Direct OCR endpoint for image processing
+   * Accepts image file and returns extracted text
+   */
+  app.post('/api/ocr', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ 
+          error: 'No image file provided',
+          message: 'Please upload an image file for OCR processing'
+        });
+      }
+
+      // Check if file is an image
+      const fileType = getFileTypeCategory(req.file.mimetype);
+      if (fileType !== 'IMAGE') {
+        return res.status(400).json({ 
+          error: 'Invalid file type',
+          message: 'Only image files (JPG, PNG, BMP, TIFF) are supported for OCR'
+        });
+      }
+
+      console.log(`[OCR-API] Processing image: ${req.file.originalname}`);
+
+      // Save file to disk
+      await fileManager.initialize();
+      const fileInfo = await fileManager.saveFile(req.file);
+
+      try {
+        // Initialize OCR worker if needed
+        if (!OCRModule.worker) {
+          console.log('[OCR-API] Initializing Tesseract worker...');
+          await OCRModule.initialize();
+        }
+
+        console.log(`[OCR-API] Running OCR on: ${fileInfo.filePath}`);
+        let extractedText = await OCRModule.extractText(fileInfo.filePath, 'eng');
+
+        // If extraction succeeded, return result
+        if (extractedText && extractedText.trim().length > 0) {
+          return res.json({
+            success: true,
+            text: extractedText,
+            confidence: 85, // Estimated confidence
+            filename: fileInfo.originalName,
+            fileSize: fileInfo.size,
+            source: 'tesseract-ocr',
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        // If empty result, try fallback
+        throw new Error('Tesseract returned empty text');
+
+      } catch (ocrError) {
+        console.error('[OCR-API] Tesseract OCR failed:', ocrError.message);
+        console.log('[OCR-API] Attempting fallback OCR strategy...');
+
+        try {
+          const fallbackText = await OCRFallback.extractWithFallbacks(fileInfo.filePath, {});
+          
+          return res.json({
+            success: true,
+            text: fallbackText,
+            confidence: 20, // Low confidence for fallback
+            filename: fileInfo.originalName,
+            fileSize: fileInfo.size,
+            source: 'ocr-fallback',
+            timestamp: new Date().toISOString()
+          });
+
+        } catch (fallbackError) {
+          console.error('[OCR-API] All OCR methods failed:', fallbackError.message);
+          
+          return res.status(500).json({
+            success: false,
+            error: 'OCR processing failed',
+            message: 'Unable to extract text from image',
+            filename: fileInfo.originalName,
+            source: 'error',
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error('[OCR-API] Request error:', error.message);
+      res.status(500).json({
+        success: false,
+        error: 'Server error',
+        message: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  /**
+   * GET /api/ocr/health - OCR service health check
+   */
+  app.get('/api/ocr/health', async (req, res) => {
+    try {
+      const isInitialized = OCRModule.worker !== null;
+      
+      res.json({
+        status: 'ok',
+        ocrService: {
+          name: 'Tesseract.js',
+          initialized: isInitialized,
+          language: 'English (eng)',
+          supportedFormats: ['JPG', 'PNG', 'BMP', 'TIFF'],
+          hasFallback: true
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        error: error.message
+      });
+    }
+  });
+
   return { documents };
 }
