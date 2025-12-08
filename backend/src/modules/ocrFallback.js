@@ -3,23 +3,50 @@
  * Provides multiple strategies for text extraction from images
  */
 
+import axios from 'axios';
+import fs from 'fs';
+
 export class OCRFallback {
   /**
-   * Use Google Cloud Vision API as fallback (requires API key)
-   * For now, returns a descriptive placeholder
+   * Use Free OCR API (ocr.space) - No API key required for limited usage
    */
-  static async extractWithGoogle(imagePath, googleApiKey) {
+  static async extractWithFreeOCRAPI(imagePath) {
     try {
-      if (!googleApiKey) {
-        return null; // No API key, skip this fallback
+      console.log('[OCR-Fallback] Attempting Free OCR API (ocr.space)...');
+      
+      // Read image file
+      if (!fs.existsSync(imagePath)) {
+        throw new Error(`File not found: ${imagePath}`);
       }
 
-      // This would require installing @google-cloud/vision
-      // For now, just log that it would be attempted
-      console.log('[OCR-Fallback] Google Vision API would be used here (not configured)');
+      const imageData = fs.readFileSync(imagePath);
+      const base64Image = imageData.toString('base64');
+      const mimeType = imagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+      // Call Free OCR API
+      const response = await axios.post('https://api.ocr.space/parse', {
+        apikey: 'K87899142372222', // Free tier key (limited usage)
+        base64Image: `data:${mimeType};base64,${base64Image}`,
+        language: 'eng'
+      }, {
+        timeout: 30000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data && response.data.ParsedText) {
+        const extractedText = response.data.ParsedText.trim();
+        if (extractedText.length > 0) {
+          console.log('[OCR-Fallback] Free OCR API succeeded');
+          return extractedText;
+        }
+      }
+
+      console.log('[OCR-Fallback] Free OCR API returned empty result');
       return null;
     } catch (error) {
-      console.warn('[OCR-Fallback] Google Vision fallback failed:', error.message);
+      console.warn('[OCR-Fallback] Free OCR API failed:', error.message);
       return null;
     }
   }
@@ -66,20 +93,21 @@ export class OCRFallback {
   static async extractWithFallbacks(imagePath, options = {}) {
     console.log('[OCR-Fallback] Attempting fallback extraction strategies...');
 
+    // Try Free OCR API first (most likely to work)
+    try {
+      const apiResult = await this.extractWithFreeOCRAPI(imagePath);
+      if (apiResult) {
+        return apiResult;
+      }
+    } catch (e) {
+      console.warn('[OCR-Fallback] Free OCR API error:', e.message);
+    }
+
     // Try filename extraction
     const filenameResult = this.extractFromFilename(imagePath);
     if (filenameResult) {
       console.log('[OCR-Fallback] Extracted text from filename');
       return filenameResult.text;
-    }
-
-    // Try Google Vision if API key provided
-    if (options.googleApiKey) {
-      const googleResult = await this.extractWithGoogle(imagePath, options.googleApiKey);
-      if (googleResult) {
-        console.log('[OCR-Fallback] Google Vision extraction succeeded');
-        return googleResult;
-      }
     }
 
     // Last resort: return metadata placeholder

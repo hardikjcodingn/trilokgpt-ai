@@ -14,7 +14,7 @@ export class OCRModule {
   }
 
   /**
-   * Initialize Tesseract worker
+   * Initialize Tesseract worker with CDN configuration
    */
   async initialize() {
     try {
@@ -22,8 +22,8 @@ export class OCRModule {
       if (this.initializing) {
         console.log('[OCR] Already initializing, waiting...');
         let retries = 0;
-        while (this.initializing && retries < 30) {
-          await new Promise(r => setTimeout(r, 100));
+        while (this.initializing && retries < 60) {
+          await new Promise(r => setTimeout(r, 500));
           retries++;
         }
         if (this.worker) return;
@@ -36,12 +36,12 @@ export class OCRModule {
       }
 
       this.initializing = true;
-      console.log('[OCR] Initializing Tesseract worker with language: eng...');
+      console.log('[OCR] Initializing Tesseract worker...');
       
       const { createWorker } = Tesseract;
       
-      // Create worker with proper configuration for Node.js
-      const initPromise = createWorker({
+      // Configure worker with CDN for worker files
+      const workerConfig = {
         logger: (m) => {
           if (m.status === 'recognizing') {
             console.log(`[OCR] Recognition progress: ${Math.round(m.progress * 100)}%`);
@@ -49,22 +49,33 @@ export class OCRModule {
             console.log('[OCR] Loading worker...');
           }
         },
-        // Configure for Node.js environment
-        errorHandler: (err) => console.error('[OCR] Worker error:', err),
-      });
+        // Use corepath to point to where worker files are located
+        corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@v5/tesseract-core.wasm.js',
+        workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@v5/dist/worker.min.js',
+      };
+
+      console.log('[OCR] Creating worker with CDN configuration...');
+      const initPromise = createWorker(workerConfig);
       
       // Use timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Tesseract initialization timeout (60s)')), 60000)
+        setTimeout(() => reject(new Error('Tesseract initialization timeout (90s)')), 90000)
       );
       
       this.worker = await Promise.race([initPromise, timeoutPromise]);
       
       console.log('[OCR] Loading English language model...');
-      await this.worker.loadLanguage('eng');
-      await this.worker.initialize('eng');
-      console.log('[OCR] Tesseract worker initialized successfully');
       
+      // Load language with timeout
+      const loadPromise = this.worker.loadLanguage('eng');
+      const loadTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Language loading timeout (60s)')), 60000)
+      );
+      
+      await Promise.race([loadPromise, loadTimeout]);
+      await this.worker.initialize('eng');
+      
+      console.log('[OCR] Tesseract worker initialized successfully');
       this.initializing = false;
     } catch (error) {
       console.error('[OCR] Initialization failed:', error.message);
