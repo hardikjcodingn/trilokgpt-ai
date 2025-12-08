@@ -337,6 +337,7 @@ export function createUploadRoutes(app, embedding, groq) {
    */
   app.post('/api/ask', async (req, res) => {
     try {
+      console.log('[Ask] Request received:', { body: req.body });
       const { message, messages = [], model = 'groq' } = req.body;
 
       // Extract the question from either 'message' or 'messages' array

@@ -230,13 +230,25 @@ app.get('/health', (req, res) => {
 });
 
 /**
- * GET /api/test - Test API key validity
+ * GET /api/test - Test API endpoint (simple test)
  */
-app.get('/api/test', apiKeyMiddleware, (req, res) => {
+app.get('/api/test', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'API key is valid',
-    apiKey: req.apiKey.substring(0, 4) + '...' + req.apiKey.substring(60)
+    message: 'API endpoint is working',
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
+ * POST /api/test - Test API with body
+ */
+app.post('/api/test', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'POST endpoint is working',
+    receivedBody: req.body,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -244,7 +256,8 @@ app.get('/api/test', apiKeyMiddleware, (req, res) => {
  * 404 handler
  */
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  console.log(`[404] Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ error: 'Not found', path: req.path, method: req.method });
 });
 
 /**
